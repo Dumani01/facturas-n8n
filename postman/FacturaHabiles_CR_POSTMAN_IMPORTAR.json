@@ -1,0 +1,266 @@
+{
+  "info": {
+    "name": "FacturaHabiles CR - Postman listo (SIN ID)",
+    "_postman_id": "89c61fd5-5cf9-4da0-9083-3d4d46d9129e",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Primero escucha el Webhook en n8n y ejecuta 01. La factura se crea automáticamente en JSON Server y recibe un ID. Para usar 02, publica el workflow. El ID queda guardado en ultimaFacturaId."
+  },
+  "item": [
+    {
+      "name": "01 - CREAR Y PROCESAR SIN ID (modo prueba)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{n8nBase}}/webhook-test/facturacion/calcular"
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"cliente\": \"Empresa Ejemplo Costa Rica\",\n  \"monto\": 85000,\n  \"moneda\": \"CRC\",\n  \"fechaEmision\": \"2026-10-19\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+              "pm.test(\"Devuelve ok\", () => pm.expect(pm.response.json()).to.have.property(\"ok\"));",
+              "let j=pm.response.json(); if(j.facturaId)pm.collectionVariables.set('ultimaFacturaId',String(j.facturaId));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "02 - CREAR Y PROCESAR SIN ID (publicado)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{n8nBase}}/webhook/facturacion/calcular"
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"cliente\": \"Ferretería Costa Rica\",\n  \"monto\": 125000,\n  \"moneda\": \"CRC\",\n  \"fechaEmision\": \"2026-10-19\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+              "pm.test(\"Devuelve ok\", () => pm.expect(pm.response.json()).to.have.property(\"ok\"));",
+              "let j=pm.response.json(); if(j.facturaId)pm.collectionVariables.set('ultimaFacturaId',String(j.facturaId));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "03 - REPROCESAR ULTIMA FACTURA (prueba)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{n8nBase}}/webhook-test/facturacion/calcular"
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"facturaId\": \"{{ultimaFacturaId}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+              "pm.test(\"Devuelve ok\", () => pm.expect(pm.response.json()).to.have.property(\"ok\"));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "04 - REPROCESAR ULTIMA FACTURA (publicado)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{n8nBase}}/webhook/facturacion/calcular"
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"facturaId\": \"{{ultimaFacturaId}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+              "pm.test(\"Devuelve ok\", () => pm.expect(pm.response.json()).to.have.property(\"ok\"));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "05 - ERROR 400: faltan campos (prueba)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{n8nBase}}/webhook-test/facturacion/calcular"
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"cliente\": \"Sin monto\",\n  \"fechaEmision\": \"2026-10-19\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"HTTP 400\", () => pm.response.to.have.status(400));",
+              "pm.test(\"Devuelve ok\", () => pm.expect(pm.response.json()).to.have.property(\"ok\"));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "06 - ERROR 404: ID inexistente (prueba)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{n8nBase}}/webhook-test/facturacion/calcular"
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"facturaId\": 9999999\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"HTTP 404\", () => pm.response.to.have.status(404));",
+              "pm.test(\"Devuelve ok\", () => pm.expect(pm.response.json()).to.have.property(\"ok\"));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "07 - JSON SERVER: listar facturas",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{jsonServerBase}}/facturas"
+        }
+      }
+    },
+    {
+      "name": "08 - JSON SERVER: ultima factura creada",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{jsonServerBase}}/facturas/{{ultimaFacturaId}}"
+        }
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "n8nBase",
+      "value": "http://localhost:5678"
+    },
+    {
+      "key": "jsonServerBase",
+      "value": "http://localhost:3000"
+    },
+    {
+      "key": "ultimaFacturaId",
+      "value": "1"
+    }
+  ]
+}

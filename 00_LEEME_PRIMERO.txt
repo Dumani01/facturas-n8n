@@ -1,0 +1,17 @@
+ENTREGA COMPLETA - LABORATORIO #1 / ESCENARIO #1 - FACTURACION DIAS HABILES
+
+1. DESCOMPRIME EL ZIP.
+2. WINDOWS: doble clic en INICIAR_TODO_WINDOWS.bat (Node.js 20+ requerido).
+   DOCKER: usa INICIAR_CON_DOCKER_WINDOWS.bat (Docker Desktop requerido).
+3. Abre http://localhost:5678
+4. Importa el workflow de la carpeta workflow/ que corresponde a tu modo Windows o Docker.
+5. En el nodo Webhook pulsa Listen for Test Event.
+6. En Postman importa la coleccion postman/FacturaHabiles_CR_POSTMAN_IMPORTAR.json
+7. Pulsa Send en la solicitud 01 (CREAR Y PROCESAR SIN ID).
+8. Consulta http://localhost:3000/facturas
+
+NO DEBES CAMBIAR NINGUN ID EN POSTMAN: al crear, n8n y JSON Server lo generan.
+Para enviar varias facturas sin dar Listen cada vez, publica/activa el workflow y usa la solicitud 02.
+
+Las pruebas locales no equivalen a una prueba real dentro de tu instancia de n8n.
+Consulta README.md para solucionar errores.

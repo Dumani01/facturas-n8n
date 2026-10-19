@@ -1,0 +1,25 @@
+{
+  "name": "laboratorio1-facturacion-poo-n8n",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Laboratorio integrador: facturas, POO, JSON Server y feriados Nager.Date",
+  "scripts": {
+    "db": "json-server --watch db.json --port 3000 --host 127.0.0.1",
+    "seed": "node scripts/seed.mjs",
+    "demo": "node main.js",
+    "test": "node --test tests/*.test.mjs",
+    "workflow": "node scripts/generar-integracion.mjs",
+    "check": "npm run workflow && npm test",
+    "verificar": "node scripts/verificar-conexiones.mjs",
+    "probar:postman": "node scripts/probar-webhook.mjs test",
+    "probar:produccion": "node scripts/probar-webhook.mjs prod",
+    "generar:integracion": "node scripts/generar-integracion.mjs"
+  },
+  "devDependencies": {
+    "json-server": "^0.17.4"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

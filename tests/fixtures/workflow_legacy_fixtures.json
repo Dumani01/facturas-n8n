@@ -1,0 +1,447 @@
+{
+  "name": "Laboratorio 1 | Central de facturación | 15 días hábiles | POO + n8n",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "b6eeb732-eee1-4086-8fdf-5fd56a2c1ff7",
+      "name": "Ejecutar manualmente",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        180,
+        90
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "days",
+              "triggerAtHour": 8,
+              "triggerAtMinute": 0
+            }
+          ]
+        }
+      },
+      "id": "e7b9f44e-a988-43b8-bb56-65db84b55b1f",
+      "name": "Programar diario 08:00 CR",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        180,
+        290
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// Se usa la fecha civil de Costa Rica, no la del servidor o navegador.\nconst parts = new Intl.DateTimeFormat('en-US', { timeZone: 'America/Costa_Rica',\n  year: 'numeric', month:'2-digit', day:'2-digit' }).formatToParts(new Date());\nconst part = tipo => parts.find(p=>p.type===tipo).value;\nconst hoy = [part('year'),part('month'),part('day')].join('-');\nreturn [{ json: { hoy, anioActual: Number(part('year')), anioSiguiente: Number(part('year'))+1,\n  diasHabiles:15, pais:'CR' } }];"
+      },
+      "id": "c60f7183-a615-4949-8861-cbe3531405f7",
+      "name": "Preparar fecha y plazo",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        420,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "http://127.0.0.1:3000/facturas",
+        "options": {
+          "timeout": 20000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "abc9d26f-57b5-4fe5-bc7f-dc111cb01983",
+      "name": "GET - facturas JSON Server",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        650,
+        180
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const r = $input.first()?.json;\nif (!r || r.statusCode !== 200 || !Array.isArray(r.body)) {\n  throw new Error('JSON Server no respondió HTTP 200 con un arreglo de facturas');\n}\nconst c = $('Preparar fecha y plazo').first().json;\nreturn [{ json: { ...c, facturas: r.body, totalLeidas: r.body.length } }];"
+      },
+      "id": "e89f5de7-8ed6-4d81-9fd8-483d88c65b22",
+      "name": "Validar respuesta JSON Server",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ 'https://date.nager.at/api/v3/PublicHolidays/' + $json.anioActual + '/CR' }}",
+        "options": {
+          "timeout": 20000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "0fe373be-cf12-4988-9f83-9ca0a321fdc1",
+      "name": "GET - feriados año actual",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1100,
+        180
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const r = $input.first()?.json;\nconst c = $('Validar respuesta JSON Server').first().json;\nif (!r || r.statusCode !== 200 || !Array.isArray(r.body) || !r.body.length) {\n throw new Error('API Nager.Date año actual: HTTP inválido, servicio no soportado o calendario vacío');\n}\nif (r.body.some(h => typeof h.date !== 'string' || !h.date.startsWith(String(c.anioActual) + '-'))) {\n throw new Error('API Nager.Date devolvió fechas fuera del año esperado');\n}\nreturn [{json:{ ...c, feriadosActuales:r.body }}];"
+      },
+      "id": "5cc82a10-b4d5-4473-a8be-b006ed9567f7",
+      "name": "Validar feriados año actual",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1320,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ 'https://date.nager.at/api/v3/PublicHolidays/' + $json.anioSiguiente + '/CR' }}",
+        "options": {
+          "timeout": 20000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "e43f93ec-a529-4229-80f4-85e88e25fc66",
+      "name": "GET - feriados año siguiente",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1540,
+        180
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// Fechas ISO estrictas, interpretadas en UTC para evitar cambios por zona horaria.\nfunction fechaUTC(iso) {\n  if (typeof iso !== 'string' || !/^\\d{4}-\\d{2}-\\d{2}$/.test(iso)) {\n    throw new Error(`Fecha ISO inválida: ${String(iso)}`);\n  }\n  const [ano, mes, dia] = iso.split('-').map(Number);\n  const fecha = new Date(Date.UTC(ano, mes - 1, dia));\n  if (fecha.getUTCFullYear() !== ano || fecha.getUTCMonth() !== mes - 1 || fecha.getUTCDate() !== dia) {\n    throw new Error(`Fecha imposible: ${iso}`);\n  }\n  return fecha;\n}\nfunction formatoISO(fecha) { return fecha.toISOString().slice(0, 10); }\nfunction sumarDiasISO(iso, cantidad) {\n  const f = fechaUTC(iso);\n  f.setUTCDate(f.getUTCDate() + cantidad);\n  return formatoISO(f);\n}\nfunction hoyCostaRica(ahora = new Date()) {\n  const partes = new Intl.DateTimeFormat('en-US', {\n    timeZone: 'America/Costa_Rica', year: 'numeric', month: '2-digit', day: '2-digit'\n  }).formatToParts(ahora);\n  const valor = (tipo) => partes.find(p => p.type === tipo)?.value;\n  return `${valor('year')}-${valor('month')}-${valor('day')}`;\n}\n\n\n\n/** Solo feriados nacionales públicos. Feriados regionales no aplican a todas las facturas. */\nclass CalendarioLaboral {\n  #feriados;\n  #aniosDisponibles;\n\n  constructor(registros = [], aniosDisponibles = []) {\n    if (!Array.isArray(registros)) throw new Error('La API de feriados debe devolver un arreglo');\n    this.#feriados = new Set();\n    this.#aniosDisponibles = new Set(aniosDisponibles.map(Number));\n    for (const feriado of registros) {\n      if (typeof feriado !== 'object' || feriado === null) throw new Error('Feriado inválido');\n      if (feriado.countryCode && feriado.countryCode !== 'CR') {\n        throw new Error(`El feriado pertenece a otro país: ${feriado.countryCode}`);\n      }\n      fechaUTC(feriado.date);\n      if (feriado.global === true && (!Array.isArray(feriado.types) || feriado.types.includes('Public'))) {\n        this.#feriados.add(feriado.date);\n      }\n    }\n  }\n\n  esDiaHabil(fechaISO) {\n    const fecha = fechaUTC(fechaISO);\n    const anio = fecha.getUTCFullYear();\n    if (!this.#aniosDisponibles.has(anio)) throw new Error(`Sin calendario de feriados verificado para ${anio}`);\n    const dia = fecha.getUTCDay();\n    return dia !== 0 && dia !== 6 && !this.#feriados.has(fechaISO);\n  }\n\n  sumarDiasHabiles(fechaEmision, dias = 15) {\n    fechaUTC(fechaEmision);\n    if (!Number.isInteger(dias) || dias <= 0 || dias > 100) throw new Error('El plazo debe ser de 1 a 100 días hábiles');\n    let actual = fechaUTC(fechaEmision);\n    let restantes = dias;\n    while (restantes > 0) {\n      actual.setUTCDate(actual.getUTCDate() + 1); // El día de emisión no se cuenta.\n      if (this.esDiaHabil(formatoISO(actual))) restantes -= 1;\n    }\n    return formatoISO(actual);\n  }\n}\n\n\n\nclass Factura {\n  #datos;\n  constructor(datos) {\n    if (!datos || typeof datos !== 'object' || Array.isArray(datos)) throw new Error('Factura inexistente o incorrecta');\n    if ((typeof datos.id !== 'number' && typeof datos.id !== 'string') || String(datos.id).trim() === '') {\n      throw new Error('Factura sin ID');\n    }\n    if (!['pendiente', 'vencida', 'pagada', 'anulada'].includes(datos.estado)) {\n      throw new Error(`Estado de factura inválido: ${String(datos.estado)}`);\n    }\n    if (typeof datos.cliente !== 'string' || !datos.cliente.trim()) throw new Error('Factura sin cliente');\n    if (typeof datos.monto !== 'number' || !Number.isFinite(datos.monto) || datos.monto <= 0) {\n      throw new Error('Monto de factura inválido');\n    }\n    fechaUTC(datos.fechaEmision);\n    if (datos.fechaVencimiento != null) fechaUTC(datos.fechaVencimiento);\n    this.#datos = { ...datos };\n  }\n  get id() { return this.#datos.id; }\n  get estado() { return this.#datos.estado; }\n  get fechaEmision() { return this.#datos.fechaEmision; }\n  calcularVencimiento(calendario, diasHabiles = 15) {\n    return calendario.sumarDiasHabiles(this.fechaEmision, diasHabiles);\n  }\n  estaVencida(hoy, vencimiento) {\n    fechaUTC(hoy);\n    fechaUTC(vencimiento);\n    return hoy > vencimiento; // Vence al acabar la fecha indicada.\n  }\n  planificarActualizacion(calendario, hoy, diasHabiles = 15) {\n    if (this.estado === 'pagada' || this.estado === 'anulada') {\n      return { tipo: 'sin_cambios', id: this.id, motivo: `Factura ${this.estado}; se respeta su estado` };\n    }\n    const fechaVencimiento = this.calcularVencimiento(calendario, diasHabiles);\n    const estado = this.estaVencida(hoy, fechaVencimiento) ? 'vencida' : 'pendiente';\n    const actualizacion = { fechaVencimiento, estado };\n    const cambio = this.#datos.fechaVencimiento !== fechaVencimiento || this.estado !== estado;\n    return cambio\n      ? { tipo: 'actualizar', id: this.id, cliente: this.#datos.cliente, actualizacion,\n          motivo: estado === 'vencida' ? 'Plazo de pago superado' : 'Vencimiento calculado' }\n      : { tipo: 'sin_cambios', id: this.id, motivo: 'Ya estaba actualizado' };\n  }\n}\n\n\n// Fuente única de reglas: src/fechas.js, CalendarioLaboral.js y Factura.js.\nconst c = $('Validar feriados año actual').first().json;\nconst r = $input.first()?.json;\nif (!r || r.statusCode !== 200 || !Array.isArray(r.body) || !r.body.length) {\n throw new Error('API Nager.Date año siguiente: HTTP inválido, servicio no soportado o calendario vacío');\n}\nif (r.body.some(h => typeof h.date !== 'string' || !h.date.startsWith(String(c.anioSiguiente) + '-'))) {\n throw new Error('API Nager.Date devolvió fechas del año siguiente fuera de rango');\n}\nconst calendario = new CalendarioLaboral([...c.feriadosActuales, ...r.body], [c.anioActual,c.anioSiguiente]);\nif (c.facturas.length === 0) return [{json:{tipo:'sin_cambios',motivo:'No hay facturas en JSON Server'}}];\nreturn c.facturas.map(registro => {\n try {\n   const factura = new Factura(registro);\n   return {json:factura.planificarActualizacion(calendario,c.hoy,c.diasHabiles)};\n } catch (e) {\n   return {json:{tipo:'error_dato',id:registro?.id ?? null,motivo:String(e.message)}};\n }\n});"
+      },
+      "id": "47c1d48c-d4ba-4798-aca1-7bc3f00c3cba",
+      "name": "Aplicar POO y clasificar facturas",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1780,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "49f90c7b-8e5c-4760-a0ff-e99ba8c179b6",
+              "leftValue": "={{ $json.tipo }}",
+              "rightValue": "actualizar",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "a637caab-da72-4b1e-95bc-05fe7c320527",
+      "name": "IF - requiere actualización",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        2050,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ 'http://127.0.0.1:3000/facturas/' + encodeURIComponent($json.id) }}",
+        "options": {
+          "timeout": 20000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.actualizacion) }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        }
+      },
+      "id": "ac75a8b6-f6c6-4439-8d28-ac4c55f33d12",
+      "name": "PATCH - actualizar factura",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2290,
+        90
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "return $input.all().map(i=>({json:{\n  tipo:i.json.tipo, id:i.json.id ?? null, motivo:i.json.motivo ?? 'Sin cambios'\n}}));"
+      },
+      "id": "b0fb37cf-ecb4-4e47-8a51-212b658788a3",
+      "name": "Resultado sin escritura",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2290,
+        380
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "return $input.all().map(i => {\n  const r = i.json;\n  if (!r || ![200,201].includes(r.statusCode) || !r.body || r.body.id == null) {\n    return {json:{tipo:'error_escritura',statusCode:r?.statusCode ?? null,\n      motivo:'JSON Server no confirmó el PATCH con una factura válida'}};\n  }\n  return {json:{tipo:'actualizada',id:r.body.id,cliente:r.body.cliente,\n    estado:r.body.estado,fechaVencimiento:r.body.fechaVencimiento}};\n});"
+      },
+      "id": "dad5f879-6873-4ee6-be1a-737a953cb892",
+      "name": "Confirmar actualización HTTP",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2530,
+        90
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "return $input.all().map(item => ({ json: {\n  tipo:'error_servicio', motivo: String(item.json?.error?.message ?? item.json?.message ?? 'Fallo de conexión HTTP'),\n  detalle: 'Verifique que JSON Server esté encendido, la red y el servicio externo. No se fuerza ninguna actualización.'\n}}));"
+      },
+      "id": "26b159ce-9364-4c95-9f58-77745c4f97d1",
+      "name": "Error de servicio - sin escrituras",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1600,
+        630
+      ]
+    }
+  ],
+  "connections": {
+    "Ejecutar manualmente": {
+      "main": [
+        [
+          {
+            "node": "Preparar fecha y plazo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Programar diario 08:00 CR": {
+      "main": [
+        [
+          {
+            "node": "Preparar fecha y plazo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar fecha y plazo": {
+      "main": [
+        [
+          {
+            "node": "GET - facturas JSON Server",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GET - facturas JSON Server": {
+      "main": [
+        [
+          {
+            "node": "Validar respuesta JSON Server",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Error de servicio - sin escrituras",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validar respuesta JSON Server": {
+      "main": [
+        [
+          {
+            "node": "GET - feriados año actual",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GET - feriados año actual": {
+      "main": [
+        [
+          {
+            "node": "Validar feriados año actual",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Error de servicio - sin escrituras",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validar feriados año actual": {
+      "main": [
+        [
+          {
+            "node": "GET - feriados año siguiente",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GET - feriados año siguiente": {
+      "main": [
+        [
+          {
+            "node": "Aplicar POO y clasificar facturas",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Error de servicio - sin escrituras",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aplicar POO y clasificar facturas": {
+      "main": [
+        [
+          {
+            "node": "IF - requiere actualización",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF - requiere actualización": {
+      "main": [
+        [
+          {
+            "node": "PATCH - actualizar factura",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Resultado sin escritura",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PATCH - actualizar factura": {
+      "main": [
+        [
+          {
+            "node": "Confirmar actualización HTTP",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Error de servicio - sin escrituras",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "America/Costa_Rica"
+  },
+  "active": false,
+  "meta": {
+    "templateCredsSetupCompleted": true
+  }
+}

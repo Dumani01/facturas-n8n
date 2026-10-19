@@ -1,0 +1,778 @@
+{
+  "name": "Facturacion CR - POSTMAN sin ID - POO + n8n",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "facturacion/calcular",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "5e6466fb-b7e9-487d-92a4-e6a244afd813",
+      "name": "Webhook POST - Recibir factura",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        200,
+        200
+      ],
+      "webhookId": "8ddbc1d3-774b-4e78-baad-5b95c03e0c04"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const raw=$input.first()?.json;\nlet body=raw?.body??raw;\nif(typeof body==='string'){try{body=JSON.parse(body);}catch{body=null;}}\nconst error=mensaje=>[{json:{ok:false,httpStatus:400,tipo:'error_solicitud',mensaje}}];\nif(!body || typeof body!=='object' || Array.isArray(body)) return error('En Body seleccione raw -> JSON y envie cliente, monto y fechaEmision');\nif(body.facturaId!==undefined && body.facturaId!==null){\n  const id=body.facturaId;\n  const valido=(typeof id==='number' && Number.isSafeInteger(id)&&id>0)||\n   (typeof id==='string' && /^[1-9][0-9]*$/.test(id) && Number.isSafeInteger(Number(id)));\n  if(!valido) return error('facturaId debe ser entero positivo, o envie cliente, monto y fechaEmision sin ID');\n  return [{json:{ok:true,modo:'existente',facturaId:String(id)}}];\n}\nconst f=(body.factura&&typeof body.factura==='object'&&!Array.isArray(body.factura))?body.factura:body;\nif(typeof f.cliente!=='string'||f.cliente.trim().length<2||f.cliente.trim().length>120) return error('cliente debe contener entre 2 y 120 caracteres');\nif(typeof f.monto!=='number'||!Number.isFinite(f.monto)||f.monto<=0) return error('monto debe ser un numero positivo, sin comillas');\nif(f.moneda!==undefined&&!['CRC','USD'].includes(f.moneda)) return error('moneda debe ser CRC o USD');\nconst iso=f.fechaEmision;\nif(typeof iso!=='string'||!/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(iso)) return error('fechaEmision debe tener formato YYYY-MM-DD');\nconst [a,m,d]=iso.split('-').map(Number); const fecha=new Date(Date.UTC(a,m-1,d));\nif(fecha.getUTCFullYear()!==a||fecha.getUTCMonth()!==m-1||fecha.getUTCDate()!==d) return error('fechaEmision es una fecha imposible');\nconst facturaNueva={cliente:f.cliente.trim(),monto:f.monto,moneda:f.moneda??'CRC',fechaEmision:iso,fechaVencimiento:null,estado:'pendiente'};\nreturn [{json:{ok:true,modo:'nueva',facturaNueva}}];"
+      },
+      "id": "bc3a90e6-8886-485d-83af-487cb491a7a5",
+      "name": "Validar solicitud - ID opcional",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "5d62b69c-c6a8-4a8f-b59d-2a5bf2a541e8",
+              "leftValue": "={{ $json.ok }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              },
+              "rightValue": true
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "d0b1945c-8fdf-421f-9d21-02e6a79b451e",
+      "name": "IF - Peticion valida",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        690,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "a151308c-de3e-4be5-94ef-b1f91d69d2a1",
+              "leftValue": "={{ $json.modo }}",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              },
+              "rightValue": "nueva"
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "7cc8faab-30cc-4a39-85c0-4eb303ab46bf",
+      "name": "IF - Crear o consultar",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        920,
+        170
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "__JSON_SERVER_BASE__/facturas",
+        "options": {
+          "timeout": 20000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.facturaNueva) }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        }
+      },
+      "id": "37592b49-0289-4288-8afe-625a2b0c0fd8",
+      "name": "POST - Crear nueva factura",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1160,
+        100
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ '__JSON_SERVER_BASE__/facturas/' + encodeURIComponent($json.facturaId) }}",
+        "options": {
+          "timeout": 20000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "2b12cd41-2bd9-4926-b096-3c505d2c6126",
+      "name": "GET - Consultar por ID",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1160,
+        320
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const r=$input.first()?.json;\nconst req=$('Validar solicitud - ID opcional').first().json;\nconst esperado=req.modo==='nueva'?201:200;\nif(!r||r.statusCode!==esperado||!r.body||typeof r.body!=='object'||Array.isArray(r.body)){\n return [{json:{ok:false,httpStatus:r?.statusCode===404?404:502,\n  tipo:r?.statusCode===404?'factura_no_existe':'error_json_server',\n  mensaje:r?.statusCode===404?'La factura no existe en JSON Server':'JSON Server no confirmo la factura'}}];\n}\nconst factura=r.body;\nif((typeof factura.id!=='number' && typeof factura.id!=='string')||!String(factura.id).trim()){\n return [{json:{ok:false,httpStatus:502,tipo:'error_json_server',mensaje:'JSON Server no asigno ID'}}];\n}\nconst partes=new Intl.DateTimeFormat('en-US',{timeZone:'America/Costa_Rica',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date());\nconst v=k=>partes.find(p=>p.type===k).value;\nconst hoy=`${v('year')}-${v('month')}-${v('day')}`;\nconst anio=Number(String(factura.fechaEmision??'').slice(0,4));\nif(!Number.isInteger(anio)||anio<1900||anio>2100) return [{json:{ok:false,httpStatus:422,\n tipo:'factura_invalida',facturaId:factura.id,mensaje:'La fecha de emision guardada es invalida'}}];\nreturn [{json:{ok:true,modo:req.modo,facturaId:String(factura.id),factura,hoy,\n anioInicial:anio,anioSiguiente:anio+1,diasHabiles:15}}];"
+      },
+      "id": "020625d3-7f05-4fe0-964f-8fd83ae030e7",
+      "name": "Validar factura en JSON Server",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1410,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "c3280237-6411-45c2-a20d-86c88e5b8dce",
+              "leftValue": "={{ $json.ok }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              },
+              "rightValue": true
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "c09db5da-d8c5-40e4-974a-da8ba4b47ff3",
+      "name": "IF - Factura cargada",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1640,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ 'https://date.nager.at/api/v3/PublicHolidays/' + $json.anioInicial + '/CR' }}",
+        "options": {
+          "timeout": 20000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "efc7f025-db9c-4367-a088-bab35c614e72",
+      "name": "GET - Feriados CR anio de emision",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1870,
+        130
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const r=$input.first()?.json;\nconst c=$('Validar factura en JSON Server').first().json;\nif(!r||r.statusCode!==200||!Array.isArray(r.body)||!r.body.length||\n  r.body.some(h=>!h||typeof h.date!=='string'||!h.date.startsWith(String(c.anioInicial)+'-'))){\n return [{json:{ok:false,httpStatus:502,tipo:'error_feriados',facturaId:c.facturaId,\n mensaje:'No se pudieron validar feriados del anio de emision. Sin PATCH'}}];\n}\nreturn [{json:{...c,feriadosIniciales:r.body}}];"
+      },
+      "id": "fa6bd82d-5d3b-4bf7-817a-235443c75581",
+      "name": "Validar respuesta feriados Nager",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2120,
+        130
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "cafed8b6-2ff2-4c96-bfa4-ddb650eaa6a6",
+              "leftValue": "={{ $json.ok }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              },
+              "rightValue": true
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "9622f807-e3bc-45e3-a057-3aa673776af8",
+      "name": "IF - Calendario valido",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        2360,
+        130
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ 'https://date.nager.at/api/v3/PublicHolidays/' + $json.anioSiguiente + '/CR' }}",
+        "options": {
+          "timeout": 20000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "14a532a3-ff44-4404-8b06-520b542c2530",
+      "name": "GET - Feriados CR siguiente anio",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2610,
+        100
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "__CODIGO_POO_GENERADO__\n// Estas clases se insertan desde src/ al generar el JSON del workflow.\nconst c=$('Validar respuesta feriados Nager').first().json;\nconst r=$input.first()?.json;\nif(!r||r.statusCode!==200||!Array.isArray(r.body)||!r.body.length||\n  r.body.some(h=>!h||typeof h.date!=='string'||!h.date.startsWith(String(c.anioSiguiente)+'-'))){\n return [{json:{ok:false,httpStatus:502,tipo:'error_feriados',facturaId:c.facturaId,\n mensaje:'No se pudieron validar feriados del anio siguiente. Sin PATCH'}}];\n}\ntry {\n const calendario=new CalendarioLaboral([...c.feriadosIniciales,...r.body],[c.anioInicial,c.anioSiguiente]);\n const factura=new Factura(c.factura);\n const plan=factura.planificarActualizacion(calendario,c.hoy,c.diasHabiles);\n return [{json:{ok:true,httpStatus:200,facturaId:c.facturaId,\n  cliente:c.factura.cliente,monto:c.factura.monto,moneda:c.factura.moneda,\n  fechaEmision:c.factura.fechaEmision,fechaConsulta:c.hoy,diasHabiles:c.diasHabiles,modo:c.modo,\n  ...plan}}];\n}catch(err){\n return [{json:{ok:false,httpStatus:422,tipo:'error_datos_factura',facturaId:c.facturaId,\n  mensaje:String(err.message)}}];\n}"
+      },
+      "id": "6c294ccd-fd39-4004-bdab-9a0599447c83",
+      "name": "POO - Calcular 15 dias habiles",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2830,
+        90
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "49fcb542-1b8a-48d8-bb87-7f8b16b0783b",
+              "leftValue": "={{ $json.ok }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              },
+              "rightValue": true
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "1087c74f-cdc7-4591-a48c-f96314f59067",
+      "name": "IF - POO sin error",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        3060,
+        90
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "470be878-efa6-4172-84ef-0de2979498bb",
+              "leftValue": "={{ $json.tipo }}",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              },
+              "rightValue": "actualizar"
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "c5c88569-b78c-44c8-93f1-e2ec13b69ea2",
+      "name": "IF - Necesita PATCH",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        3300,
+        90
+      ]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ '__JSON_SERVER_BASE__/facturas/' + encodeURIComponent($json.facturaId) }}",
+        "options": {
+          "timeout": 20000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.actualizacion) }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        }
+      },
+      "id": "662854a1-686d-42b1-b02f-e90e76ac2956",
+      "name": "PATCH - Guardar factura calculada",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3530,
+        10
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const r=$input.first()?.json;\nconst plan=$('POO - Calcular 15 dias habiles').first().json;\nif(!r||![200,201].includes(r.statusCode)||!r.body||\n String(r.body.id)!==String(plan.facturaId)||\n r.body.estado!==plan.actualizacion.estado||r.body.fechaVencimiento!==plan.actualizacion.fechaVencimiento){\n return [{json:{ok:false,httpStatus:502,tipo:'error_escritura',facturaId:plan.facturaId,\n mensaje:'JSON Server no confirmo el PATCH esperado'}}];\n}\nreturn [{json:{ok:true,httpStatus:200,tipo:'factura_procesada',facturaId:plan.facturaId,\n cliente:r.body.cliente,monto:r.body.monto,moneda:r.body.moneda,\n fechaEmision:r.body.fechaEmision,fechaVencimiento:r.body.fechaVencimiento,\n estado:r.body.estado,diasHabiles:plan.diasHabiles,modo:plan.modo,mensaje:plan.motivo}}];"
+      },
+      "id": "972e5deb-34c0-4f7b-a263-296c27d61e7e",
+      "name": "Confirmar escritura JSON Server",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3760,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const p=$input.first()?.json;\nreturn [{json:{ok:true,httpStatus:200,tipo:'sin_cambios',facturaId:p.facturaId,\n cliente:p.cliente,monto:p.monto,moneda:p.moneda,fechaEmision:p.fechaEmision,\n fechaVencimiento:p.actualizacion?.fechaVencimiento??null,diasHabiles:p.diasHabiles,\n mensaje:p.motivo}}];"
+      },
+      "id": "334c90ba-a159-4995-b568-73716bdd760c",
+      "name": "Respuesta sin cambios",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3530,
+        250
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const r=$input.first()?.json??{};\nlet facturaId=null;\ntry{facturaId=$('Validar factura en JSON Server').first().json.facturaId;}catch{}\nreturn [{json:{ok:false,httpStatus:503,tipo:'error_conexion',facturaId,\n mensaje:'No fue posible conectar a JSON Server o Nager.Date',\n detalle:String(r?.error?.message??r.message??'Error de red')}}];"
+      },
+      "id": "572f0b6b-454a-454d-bed2-c36b3ba2bcc7",
+      "name": "ERROR - Servicio no disponible",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3310,
+        650
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "responseCode": "={{ $json.httpStatus || 200 }}"
+        }
+      },
+      "id": "89d25407-2def-4cc5-ac1e-b21548ccc10b",
+      "name": "RESPONDER JSON A POSTMAN",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        4040,
+        140
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook POST - Recibir factura": {
+      "main": [
+        [
+          {
+            "node": "Validar solicitud - ID opcional",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validar solicitud - ID opcional": {
+      "main": [
+        [
+          {
+            "node": "IF - Peticion valida",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF - Peticion valida": {
+      "main": [
+        [
+          {
+            "node": "IF - Crear o consultar",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "RESPONDER JSON A POSTMAN",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF - Crear o consultar": {
+      "main": [
+        [
+          {
+            "node": "POST - Crear nueva factura",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "GET - Consultar por ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "POST - Crear nueva factura": {
+      "main": [
+        [
+          {
+            "node": "Validar factura en JSON Server",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "ERROR - Servicio no disponible",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GET - Consultar por ID": {
+      "main": [
+        [
+          {
+            "node": "Validar factura en JSON Server",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "ERROR - Servicio no disponible",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validar factura en JSON Server": {
+      "main": [
+        [
+          {
+            "node": "IF - Factura cargada",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF - Factura cargada": {
+      "main": [
+        [
+          {
+            "node": "GET - Feriados CR anio de emision",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "RESPONDER JSON A POSTMAN",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GET - Feriados CR anio de emision": {
+      "main": [
+        [
+          {
+            "node": "Validar respuesta feriados Nager",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "ERROR - Servicio no disponible",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validar respuesta feriados Nager": {
+      "main": [
+        [
+          {
+            "node": "IF - Calendario valido",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF - Calendario valido": {
+      "main": [
+        [
+          {
+            "node": "GET - Feriados CR siguiente anio",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "RESPONDER JSON A POSTMAN",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GET - Feriados CR siguiente anio": {
+      "main": [
+        [
+          {
+            "node": "POO - Calcular 15 dias habiles",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "ERROR - Servicio no disponible",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "POO - Calcular 15 dias habiles": {
+      "main": [
+        [
+          {
+            "node": "IF - POO sin error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF - POO sin error": {
+      "main": [
+        [
+          {
+            "node": "IF - Necesita PATCH",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "RESPONDER JSON A POSTMAN",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF - Necesita PATCH": {
+      "main": [
+        [
+          {
+            "node": "PATCH - Guardar factura calculada",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respuesta sin cambios",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PATCH - Guardar factura calculada": {
+      "main": [
+        [
+          {
+            "node": "Confirmar escritura JSON Server",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "ERROR - Servicio no disponible",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Confirmar escritura JSON Server": {
+      "main": [
+        [
+          {
+            "node": "RESPONDER JSON A POSTMAN",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Respuesta sin cambios": {
+      "main": [
+        [
+          {
+            "node": "RESPONDER JSON A POSTMAN",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ERROR - Servicio no disponible": {
+      "main": [
+        [
+          {
+            "node": "RESPONDER JSON A POSTMAN",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "America/Costa_Rica"
+  },
+  "active": false
+}

@@ -1,0 +1,6 @@
+[
+  { "date": "2026-01-01", "countryCode": "CR", "global": true, "types": ["Public"], "localName": "Año Nuevo" },
+  { "date": "2026-09-15", "countryCode": "CR", "global": true, "types": ["Public"], "localName": "Independencia" },
+  { "date": "2026-12-25", "countryCode": "CR", "global": true, "types": ["Public"], "localName": "Navidad" },
+  { "date": "2027-01-01", "countryCode": "CR", "global": true, "types": ["Public"], "localName": "Año Nuevo" }
+]

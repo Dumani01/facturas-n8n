@@ -1,0 +1,26 @@
+name: facturacion-cr
+services:
+  json-server:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.jsonserver
+    ports:
+      - "127.0.0.1:3000:3000"
+    volumes:
+      - ./db.json:/app/db.json
+    restart: unless-stopped
+  n8n:
+    image: docker.n8n.io/n8nio/n8n:latest
+    ports:
+      - "127.0.0.1:5678:5678"
+    environment:
+      GENERIC_TIMEZONE: America/Costa_Rica
+      TZ: America/Costa_Rica
+      N8N_SECURE_COOKIE: "false"
+    volumes:
+      - n8n_data:/home/node/.n8n
+    depends_on:
+      - json-server
+    restart: unless-stopped
+volumes:
+  n8n_data:

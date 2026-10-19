@@ -1,0 +1,58 @@
+{
+  "facturas": [
+    {
+      "id": 1,
+      "cliente": "Cooperativa del Pacífico",
+      "monto": 175000,
+      "moneda": "CRC",
+      "fechaEmision": "2026-09-17",
+      "fechaVencimiento": null,
+      "estado": "pendiente"
+    },
+    {
+      "id": 2,
+      "cliente": "Distribuidora Marina",
+      "monto": 89500,
+      "moneda": "CRC",
+      "fechaEmision": "2026-10-11",
+      "fechaVencimiento": null,
+      "estado": "pendiente"
+    },
+    {
+      "id": 3,
+      "cliente": "Servicios del Golfo",
+      "monto": 250000,
+      "moneda": "CRC",
+      "fechaEmision": "2026-10-17",
+      "fechaVencimiento": null,
+      "estado": "pendiente"
+    },
+    {
+      "id": 4,
+      "cliente": "Empresa cancelada",
+      "monto": 99000,
+      "moneda": "CRC",
+      "fechaEmision": "2026-09-04",
+      "fechaVencimiento": null,
+      "estado": "pagada"
+    },
+    {
+      "id": 5,
+      "cliente": "Factura anulada",
+      "monto": 12000,
+      "moneda": "CRC",
+      "fechaEmision": "2026-09-14",
+      "fechaVencimiento": null,
+      "estado": "anulada"
+    },
+    {
+      "id": 6,
+      "cliente": "Factura con monto inválido",
+      "monto": -100,
+      "moneda": "CRC",
+      "fechaEmision": "2026-10-14",
+      "fechaVencimiento": null,
+      "estado": "pendiente"
+    }
+  ]
+}

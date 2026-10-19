@@ -1,0 +1,4 @@
+FROM node:22-alpine
+WORKDIR /app
+RUN npm install --no-audit --no-fund json-server@0.17.4
+CMD ["./node_modules/.bin/json-server", "--watch", "/app/db.json", "--host", "0.0.0.0", "--port", "3000"]
